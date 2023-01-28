@@ -148,6 +148,15 @@ void SignalRegistry::setNotifyFd(int sig, int fd) {
   }
 }
 
+void checkLogOverflow(FOLLY_MAYBE_UNUSED struct io_uring* ring) {
+#if FOLLY_IO_URING_UP_TO_DATE
+  if (::io_uring_cq_has_overflow(ring)) {
+    FB_LOG_EVERY_MS(ERROR, 10000)
+        << "IoUringBackend " << ring << " cq overflow";
+  }
+#endif
+}
+
 } // namespace
 
 namespace {
@@ -402,7 +411,7 @@ class ProvidedBuffersBuffer {
   uint32_t ringCount() const noexcept { return 1 + ringMask_; }
 
   char* buffer(uint16_t idx) {
-    size_t offset = idx << bufferShift_;
+    size_t offset = (size_t)idx << bufferShift_;
     return bufferBuffer_ + offset;
   }
 
@@ -1771,6 +1780,8 @@ unsigned int IoUringBackend::internalProcessCqe(
 
   unsigned int count_more = 0;
   unsigned int count = 0;
+
+  checkLogOverflow(&ioRing_);
   do {
     unsigned int head;
     unsigned int loop_count = 0;

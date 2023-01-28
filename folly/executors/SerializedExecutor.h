@@ -16,35 +16,16 @@
 
 #pragma once
 
-#include <folly/Portability.h>
-
-#include <cstdint>
-
-#ifdef _MSC_VER
-#include <intrin.h>
-#endif
+#include <folly/executors/SequencedExecutor.h>
 
 namespace folly {
-inline void asm_volatile_memory() {
-#if defined(__GNUC__) || defined(__clang__)
-  asm volatile("" : : : "memory");
-#elif defined(_MSC_VER)
-  ::_ReadWriteBarrier();
-#endif
-}
 
-inline void asm_volatile_pause() {
-#if defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_X64))
-  ::_mm_pause();
-#elif defined(__i386__) || FOLLY_X64 || \
-    (defined(__mips_isa_rev) && __mips_isa_rev > 1)
-  asm volatile("pause");
-#elif FOLLY_AARCH64
-  asm volatile("isb");
-#elif (defined(__arm__) && !(__ARM_ARCH < 7))
-  asm volatile("yield");
-#elif FOLLY_PPC64
-  asm volatile("or 27,27,27");
-#endif
-}
+// SerializedExecutor is a SequencedExecutor with the additional guarantee that
+// no tasks added to the executor are run concurrently, even if their add()s
+// were not sequenced.
+class SerializedExecutor : public SequencedExecutor {
+ public:
+  virtual ~SerializedExecutor() override {}
+};
+
 } // namespace folly
